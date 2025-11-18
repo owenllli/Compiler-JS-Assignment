@@ -79,21 +79,28 @@ start:
         "break"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BREAK); }
         "case"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CASE); }
         "catch"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CATCH); }
+        "class"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CLASS); }    // 新增
         "const"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CONST); }
         "continue"                  { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CONTINUE); }
         "default"                   { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DEFAULT); }
         "delete"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DELETE); }
         "do"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DO); }
         "else"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(ELSE); }
+        "export"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(EXPORT); }   // 新增
+        "extends"                   { SET_REGEX_ALLOWED(1); RETURN_TOKEN(EXTENDS); }  // 新增
         "finally"                   { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FINALLY); }
         "for"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FOR); }
         "function"                  { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FUNCTION); }
         "if"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(IF); }
+        "import"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(IMPORT); }   // 新增
         "in"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(IN); }
         "instanceof"                { SET_REGEX_ALLOWED(1); RETURN_TOKEN(INSTANCEOF); }
         "let"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LET); }
         "new"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(NEW); }
+        "of"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(OF); }
         "return"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(RETURN); }
+        "static"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(STATIC); }   // 新增
+        "super"                     { SET_REGEX_ALLOWED(0); RETURN_TOKEN(SUPER); }    // 新增
         "switch"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(SWITCH); }
         "this"                      { SET_REGEX_ALLOWED(0); RETURN_TOKEN(THIS); }
         "throw"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(THROW); }
@@ -103,7 +110,7 @@ start:
         "void"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(VOID); }
         "while"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(WHILE); }
         "with"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(WITH); }
-        
+
         // Literals
         "true"                      { yylval.str = strdup("true"); SET_REGEX_ALLOWED(0); RETURN_TOKEN(TRUE); }
         "false"                     { yylval.str = strdup("false"); SET_REGEX_ALLOWED(0); RETURN_TOKEN(FALSE); }

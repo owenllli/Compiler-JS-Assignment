@@ -33,7 +33,8 @@ int check_asi() {
 %token <str> IDENTIFIER NUMBER STRING REGEX
 %token <str> BREAK CASE CATCH CONTINUE DEFAULT DELETE DO ELSE FINALLY FOR FUNCTION
 %token <str> IF IN INSTANCEOF NEW RETURN SWITCH THIS THROW TRY TYPEOF VAR VOID WHILE WITH
-%token <str> CONST LET // ES6
+%token <str> CONST LET CLASS EXTENDS SUPER STATIC EXPORT IMPORT // ES6 Added
+%token <str> OF
 %token <str> TRUE FALSE NULL_LITERAL
 
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET
@@ -52,11 +53,12 @@ int check_asi() {
 // Non-terminals
 %type <node> Program SourceElements SourceElement Statement Block
 %type <node> VariableStatement VariableDeclarationList VariableDeclaration
-%type <node> LexicalDeclaration BindingList LexicalBinding // ES6
+%type <node> LexicalDeclaration BindingList LexicalBinding
 %type <node> EmptyStatement ExpressionStatement IfStatement IterationStatement
 %type <node> ContinueStatement BreakStatement ReturnStatement WithStatement
 %type <node> SwitchStatement ThrowStatement TryStatement
 %type <node> FunctionDeclaration FunctionExpression ArrowFunction
+%type <node> ClassDeclaration ClassExpression ClassTail ClassBody ClassElementList ClassElement // Class additions
 %type <node> FormalParameterList ArrowFormalParameters
 %type <node> Expression ExpressionOpt AssignmentExpression ConditionalExpression
 %type <node> LogicalORExpression LogicalANDExpression BitwiseORExpression
@@ -66,6 +68,7 @@ int check_asi() {
 %type <node> LeftHandSideExpression CallExpression NewExpression MemberExpression
 %type <node> PrimaryExpression ArrayLiteral ObjectLiteral
 %type <node> ElementList PropertyNameAndValueList Literal
+%type <node> PropertyName IdentifierName // Helper for "Keyword as ID"
 %type <node> Arguments ArgumentList
 %type <node> Elision ElisionOpt
 %type <node> CaseBlock CaseClauses CaseClause DefaultClause
@@ -98,6 +101,47 @@ Program:
     | /* empty */ { root = create_node(NODE_PROGRAM, NULL); YYACCEPT; }
     ;
 
+/* --- Helper: Keywords that can be Identifiers in property names --- */
+IdentifierName:
+    IDENTIFIER { $$ = create_node(NODE_IDENTIFIER, $1); free($1); }
+    | DEFAULT { $$ = create_node(NODE_IDENTIFIER, "default"); }
+    | DELETE { $$ = create_node(NODE_IDENTIFIER, "delete"); }
+    | CLASS { $$ = create_node(NODE_IDENTIFIER, "class"); }
+    | EXTENDS { $$ = create_node(NODE_IDENTIFIER, "extends"); }
+    | SUPER { $$ = create_node(NODE_IDENTIFIER, "super"); }
+    | STATIC { $$ = create_node(NODE_IDENTIFIER, "static"); }
+    | EXPORT { $$ = create_node(NODE_IDENTIFIER, "export"); }
+    | IMPORT { $$ = create_node(NODE_IDENTIFIER, "import"); }
+    | VAR { $$ = create_node(NODE_IDENTIFIER, "var"); }
+    | LET { $$ = create_node(NODE_IDENTIFIER, "let"); }
+    | CONST { $$ = create_node(NODE_IDENTIFIER, "const"); }
+    | IF { $$ = create_node(NODE_IDENTIFIER, "if"); }
+    | ELSE { $$ = create_node(NODE_IDENTIFIER, "else"); }
+    | DO { $$ = create_node(NODE_IDENTIFIER, "do"); }
+    | WHILE { $$ = create_node(NODE_IDENTIFIER, "while"); }
+    | FOR { $$ = create_node(NODE_IDENTIFIER, "for"); }
+    | IN { $$ = create_node(NODE_IDENTIFIER, "in"); }
+    | OF { $$ = create_node(NODE_IDENTIFIER, "of"); }
+    | CONTINUE { $$ = create_node(NODE_IDENTIFIER, "continue"); }
+    | BREAK { $$ = create_node(NODE_IDENTIFIER, "break"); }
+    | RETURN { $$ = create_node(NODE_IDENTIFIER, "return"); }
+    | WITH { $$ = create_node(NODE_IDENTIFIER, "with"); }
+    | SWITCH { $$ = create_node(NODE_IDENTIFIER, "switch"); }
+    | THROW { $$ = create_node(NODE_IDENTIFIER, "throw"); }
+    | TRY { $$ = create_node(NODE_IDENTIFIER, "try"); }
+    | CATCH { $$ = create_node(NODE_IDENTIFIER, "catch"); }
+    | FINALLY { $$ = create_node(NODE_IDENTIFIER, "finally"); }
+    | NULL_LITERAL { $$ = create_node(NODE_IDENTIFIER, "null"); }
+    | TRUE { $$ = create_node(NODE_IDENTIFIER, "true"); }
+    | FALSE { $$ = create_node(NODE_IDENTIFIER, "false"); }
+    | NEW { $$ = create_node(NODE_IDENTIFIER, "new"); }
+    | THIS { $$ = create_node(NODE_IDENTIFIER, "this"); }
+    | TYPEOF { $$ = create_node(NODE_IDENTIFIER, "typeof"); }
+    | VOID { $$ = create_node(NODE_IDENTIFIER, "void"); }
+    | INSTANCEOF { $$ = create_node(NODE_IDENTIFIER, "instanceof"); }
+    | FUNCTION { $$ = create_node(NODE_IDENTIFIER, "function"); }
+    ;
+
 SourceElements:
     SourceElement { $$ = $1; }
     | SourceElements SourceElement {
@@ -115,12 +159,13 @@ SourceElements:
 SourceElement:
     Statement { $$ = $1; }
     | FunctionDeclaration { $$ = $1; }
+    | ClassDeclaration { $$ = $1; }
     ;
 
 Statement:
     Block { $$ = $1; }
     | VariableStatement { $$ = $1; }
-    | LexicalDeclaration { $$ = $1; } /* ES6 let/const */
+    | LexicalDeclaration { $$ = $1; }
     | EmptyStatement { $$ = $1; }
     | ExpressionStatement { $$ = $1; }
     | IfStatement { $$ = $1; }
@@ -494,6 +539,77 @@ FunctionDeclaration:
         $$->right = $6;
         free($2);
     }
+    ;
+
+/* Class Syntax (ES6) */
+ClassDeclaration:
+    CLASS IDENTIFIER ClassTail {
+        $$ = create_node(NODE_CLASS_DECL, $2);
+        $$->left = $3;
+        free($2);
+    }
+    ;
+
+ClassExpression:
+    CLASS ClassTail {
+        $$ = create_node(NODE_CLASS_EXPR, NULL);
+        $$->left = $2;
+    }
+    | CLASS IDENTIFIER ClassTail {
+        $$ = create_node(NODE_CLASS_EXPR, $2);
+        $$->left = $3;
+        free($2);
+    }
+    ;
+
+ClassTail:
+    LBRACE ClassBody RBRACE {
+        $$ = $2;
+    }
+    | EXTENDS LeftHandSideExpression LBRACE ClassBody RBRACE {
+        $$ = $4;
+        $$->extra = $2; /* Store extended class in extra */
+    }
+    ;
+
+ClassBody:
+    /* Empty */ { $$ = NULL; }
+    | ClassElementList { $$ = $1; }
+    ;
+
+ClassElementList:
+    ClassElement { $$ = $1; }
+    | ClassElementList ClassElement {
+        $$ = $1;
+        if ($$) {
+             ASTNode *temp = $$;
+             while (temp->next) temp = temp->next;
+             temp->next = $2;
+        } else {
+             $$ = $2;
+        }
+    }
+    ;
+
+ClassElement:
+    IdentifierName LPAREN FormalParameterList RPAREN Block {
+        /* Method Definition */
+        $$ = create_node(NODE_METHOD_DEF, NULL);
+        $$->left = $1; /* Name */
+        $$->right = $5; /* Body */
+        /* Params implicitly in $5 context or we need structure. Simplified here */
+    }
+    | IdentifierName LPAREN RPAREN Block {
+        $$ = create_node(NODE_METHOD_DEF, NULL);
+        $$->left = $1;
+        $$->right = $4;
+    }
+    | STATIC IdentifierName LPAREN RPAREN Block {
+        $$ = create_node(NODE_METHOD_DEF, "static");
+        $$->left = $2;
+        $$->right = $5;
+    }
+    | SEMICOLON { $$ = NULL; }
     ;
 
 FunctionExpression:
@@ -890,27 +1006,28 @@ CallExpression:
         $$->left = $1;
         $$->right = $3;
     }
-    | CallExpression DOT IDENTIFIER {
+    /* Fix for IdentifierName (e.g., call.default()) */
+    | CallExpression DOT IdentifierName {
         $$ = create_node(NODE_MEMBER_EXPR, ".");
         $$->left = $1;
-        $$->right = create_node(NODE_IDENTIFIER, $3);
-        free($3);
+        $$->right = $3;
     }
     ;
 
 MemberExpression:
     PrimaryExpression { $$ = $1; }
     | FunctionExpression { $$ = $1; }
+    | ClassExpression { $$ = $1; } /* Added ClassExpression here */
     | MemberExpression LBRACKET Expression RBRACKET {
         $$ = create_node(NODE_MEMBER_EXPR, "[]");
         $$->left = $1;
         $$->right = $3;
     }
-    | MemberExpression DOT IDENTIFIER {
+    /* Fix for IdentifierName (e.g., obj.default) */
+    | MemberExpression DOT IdentifierName {
         $$ = create_node(NODE_MEMBER_EXPR, ".");
         $$->left = $1;
-        $$->right = create_node(NODE_IDENTIFIER, $3);
-        free($3);
+        $$->right = $3;
     }
     | NEW MemberExpression Arguments {
         $$ = create_node(NODE_NEW_EXPR, NULL);
@@ -1012,45 +1129,25 @@ ObjectLiteral:
     }
     ;
 
+PropertyName:
+    IdentifierName { $$ = $1; }
+    | STRING { $$ = create_node(NODE_LITERAL, $1); free($1); }
+    | NUMBER { $$ = create_node(NODE_LITERAL, $1); free($1); }
+    ;
+
 PropertyNameAndValueList:
-    IDENTIFIER COLON AssignmentExpression {
-        $$ = create_node(NODE_PROPERTY, $1);
-        $$->left = $3;
-        free($1);
+    PropertyName COLON AssignmentExpression {
+        $$ = create_node(NODE_PROPERTY, NULL);
+        $$->left = $1; /* Key */
+        $$->right = $3; /* Value */
     }
-    | STRING COLON AssignmentExpression {
-        $$ = create_node(NODE_PROPERTY, $1);
-        $$->left = $3;
-        free($1);
-    }
-    | NUMBER COLON AssignmentExpression {
-        $$ = create_node(NODE_PROPERTY, $1);
-        $$->left = $3;
-        free($1);
-    }
-    | PropertyNameAndValueList COMMA IDENTIFIER COLON AssignmentExpression {
+    | PropertyNameAndValueList COMMA PropertyName COLON AssignmentExpression {
         $$ = $1;
         ASTNode *temp = $$;
         while (temp->next) temp = temp->next;
-        temp->next = create_node(NODE_PROPERTY, $3);
-        temp->next->left = $5;
-        free($3);
-    }
-    | PropertyNameAndValueList COMMA STRING COLON AssignmentExpression {
-        $$ = $1;
-        ASTNode *temp = $$;
-        while (temp->next) temp = temp->next;
-        temp->next = create_node(NODE_PROPERTY, $3);
-        temp->next->left = $5;
-        free($3);
-    }
-    | PropertyNameAndValueList COMMA NUMBER COLON AssignmentExpression {
-        $$ = $1;
-        ASTNode *temp = $$;
-        while (temp->next) temp = temp->next;
-        temp->next = create_node(NODE_PROPERTY, $3);
-        temp->next->left = $5;
-        free($3);
+        temp->next = create_node(NODE_PROPERTY, NULL);
+        temp->next->left = $3;
+        temp->next->right = $5;
     }
     ;
 

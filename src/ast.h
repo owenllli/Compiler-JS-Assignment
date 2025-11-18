@@ -10,8 +10,11 @@ typedef enum {
     NODE_PROGRAM,
     NODE_FUNCTION_DECL,
     NODE_VAR_DECL,
-    NODE_CONST_DECL, // 新增
-    NODE_LET_DECL,   // 新增
+    NODE_CONST_DECL,
+    NODE_LET_DECL,
+    NODE_CLASS_DECL,      // 新增
+    NODE_CLASS_EXPR,      // 新增
+    NODE_METHOD_DEF,      // 新增
     NODE_IDENTIFIER,
     NODE_LITERAL,
     NODE_BINARY_EXPR,
@@ -31,9 +34,12 @@ typedef enum {
     NODE_PROPERTY,
     NODE_NEW_EXPR,
     NODE_THIS_EXPR,
+    NODE_SUPER_EXPR,      // 新增
     NODE_CONDITIONAL_EXPR,
     NODE_SEQUENCE_EXPR,
-    NODE_ARROW_FUNCTION // 新增
+    NODE_ARROW_FUNCTION,
+    NODE_EXPORT_DECL,     // 新增 (可选)
+    NODE_IMPORT_DECL      // 新增 (可选)
 } NodeType;
 
 // AST Node Structure
