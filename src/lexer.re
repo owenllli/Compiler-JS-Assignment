@@ -139,6 +139,12 @@ start:
             SET_REGEX_ALLOWED(0); 
             RETURN_TOKEN(STRING); 
         }
+        // [NEW] Template Literals (Backticks) - Simplified handling
+        [`] ([^`\\\x00] | "\\" [^\x00])* [`] {
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng);
+            SET_REGEX_ALLOWED(0);
+            RETURN_TOKEN(STRING);
+        }
 
         // Identifier
         [a-zA-Z_$][a-zA-Z0-9_$]* { 

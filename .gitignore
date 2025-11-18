@@ -2,3 +2,7 @@ tests/all-samples/
 .DS_STORE
 temp.md
 temp2.md
+generate_test_report.py
+test_report.md
+generate_failed_cases.py
+failed_test_cases.md

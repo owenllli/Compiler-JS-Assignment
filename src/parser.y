@@ -52,7 +52,7 @@ int check_asi() {
 
 // Non-terminals
 %type <node> Program SourceElements SourceElement Statement Block
-%type <node> VariableStatement VariableDeclarationList VariableDeclaration
+%type <node> VariableStatement VariableDeclarationList VariableDeclaration BindingIdentifierOrPattern
 %type <node> LexicalDeclaration BindingList LexicalBinding
 %type <node> EmptyStatement ExpressionStatement IfStatement IterationStatement
 %type <node> ContinueStatement BreakStatement ReturnStatement WithStatement
@@ -211,19 +211,31 @@ VariableDeclarationList:
     }
     ;
 
-VariableDeclaration:
-    IDENTIFIER {
-        $$ = create_node(NODE_VAR_DECL, $1);
-        free($1);
+/* 新增非终结符，用于统一标识符和解构模式 */
+BindingIdentifierOrPattern:
+    IDENTIFIER { 
+        $$ = create_node(NODE_IDENTIFIER, $1); 
+        free($1); 
     }
-    | IDENTIFIER ASSIGN AssignmentExpression {
-        $$ = create_node(NODE_VAR_DECL, $1);
-        $$->left = $3;
-        free($1);
+    | ArrayLiteral { $$ = $1; }   /* Destructuring [a,b] */
+    | ObjectLiteral { $$ = $1; }  /* Destructuring {a,b} */
+    ;
+
+VariableDeclaration:
+    BindingIdentifierOrPattern {
+        /* 变量声明不带初始化: var a; */
+        $$ = create_node(NODE_VAR_DECL, NULL);
+        $$->left = $1; 
+    }
+    | BindingIdentifierOrPattern ASSIGN AssignmentExpression {
+        /* 变量声明带初始化: var a = 1; var [a] = [1]; */
+        $$ = create_node(NODE_VAR_DECL, NULL);
+        $$->left = $1;
+        $$->right = $3;
     }
     ;
 
-/* ES6 Const/Let */
+/* Lexical Declarations (Let/Const) - 修复点：补回 LexicalDeclaration */
 LexicalDeclaration:
     LET BindingList SEMICOLON { $$ = $2; }
     | LET BindingList {
@@ -245,15 +257,16 @@ BindingList:
     }
     ;
 
+/* 修复点：移除重复的旧定义，保留这个支持解构的新定义 */
 LexicalBinding:
-    IDENTIFIER {
-        $$ = create_node(NODE_LET_DECL, $1);
-        free($1);
+    BindingIdentifierOrPattern {
+        $$ = create_node(NODE_LET_DECL, NULL);
+        $$->left = $1;
     }
-    | IDENTIFIER ASSIGN AssignmentExpression {
-        $$ = create_node(NODE_LET_DECL, $1);
-        $$->left = $3;
-        free($1);
+    | BindingIdentifierOrPattern ASSIGN AssignmentExpression {
+        $$ = create_node(NODE_LET_DECL, NULL);
+        $$->left = $1;
+        $$->right = $3;
     }
     ;
 
@@ -1087,18 +1100,28 @@ ArrayLiteral:
 ElementList:
     ElisionOpt AssignmentExpression {
         $$ = $2;
-        if ($1) {
-            $$->next = $1;
-        }
+        if ($1) $$->next = $1;
+    }
+    | ElisionOpt ELLIPSIS AssignmentExpression { /* [ ...spread ] */
+        $$ = create_unary_node(NODE_UNARY_EXPR, $3);
+        $$->value = strdup("...");
+        if ($1) $$->next = $1;
     }
     | ElementList COMMA ElisionOpt AssignmentExpression {
         $$ = $1;
         ASTNode *temp = $$;
         while (temp->next) temp = temp->next;
         temp->next = $4;
-        if ($3) {
-            $4->next = $3;
-        }
+        if ($3) $4->next = $3;
+    }
+    | ElementList COMMA ElisionOpt ELLIPSIS AssignmentExpression {
+        $$ = $1;
+        ASTNode *temp = $$;
+        while (temp->next) temp = temp->next;
+        ASTNode *spread = create_unary_node(NODE_UNARY_EXPR, $5);
+        spread->value = strdup("...");
+        temp->next = spread;
+        if ($3) spread->next = $3;
     }
     ;
 
@@ -1158,11 +1181,23 @@ Arguments:
 
 ArgumentList:
     AssignmentExpression { $$ = $1; }
+    | ELLIPSIS AssignmentExpression { /* call(...arg) */
+        $$ = create_unary_node(NODE_UNARY_EXPR, $2);
+        $$->value = strdup("...");
+    }
     | ArgumentList COMMA AssignmentExpression {
         $$ = $1;
         ASTNode *temp = $$;
         while (temp->next) temp = temp->next;
         temp->next = $3;
+    }
+    | ArgumentList COMMA ELLIPSIS AssignmentExpression {
+        $$ = $1;
+        ASTNode *temp = $$;
+        while (temp->next) temp = temp->next;
+        ASTNode *spread = create_unary_node(NODE_UNARY_EXPR, $4);
+        spread->value = strdup("...");
+        temp->next = spread;
     }
     ;
 
