@@ -9,6 +9,10 @@ int yycolno = 1;
 int line_terminator_seen = 0;
 int lookahead_token = 0;
 
+// 1 = 下一个 '/' 是正则 (如: a = /.../)
+// 0 = 下一个 '/' 是除法 (如: a / b)
+int allow_regex = 1; 
+
 extern YYSTYPE yylval;
 
 const char *cursor;
@@ -24,20 +28,26 @@ void init_lexer(const char *input) {
     yycolno = 1;
     line_terminator_seen = 0;
     lookahead_token = 0;
+    allow_regex = 1;
 }
 
-#define YYCTYPE char
-#define YYCURSOR cursor
-#define YYLIMIT limit
-#define YYMARKER marker
-#define YYFILL(n)
+// 辅助宏
+#define SET_REGEX_ALLOWED(val) allow_regex = val
+#define RETURN_TOKEN(t) do { lookahead_token = t; return t; } while(0)
 
 int yylex(void) {
     int yyleng;
+
+    // --- 修复点：必须在这里定义 re2c 用于操作指针的宏 ---
+    #define YYCTYPE char
+    #define YYCURSOR cursor
+    #define YYLIMIT limit
+    #define YYMARKER marker
+    #define YYFILL(n)
+    // ------------------------------------------------
+
 start:
     token = cursor;
-    // 不在每次开始时重置 line_terminator_seen
-    // 它应该只在换行符处被设置，在解析器需要时被消耗
 
     /*!re2c
         re2c:yyfill:enable = 0;
@@ -45,9 +55,9 @@ start:
         re2c:sentinel = 0;
         
         // End of input
-        "\x00"                      { lookahead_token = END; return END; }
+        "\x00"                      { RETURN_TOKEN(END); }
         
-        // Whitespace (not line terminators)
+        // Whitespace
         [ \t\r]+                    { goto start; }
         
         // Line terminators
@@ -66,103 +76,157 @@ start:
         }
 
         // Keywords
-        "break"                     { lookahead_token = BREAK; return BREAK; }
-        "case"                      { lookahead_token = CASE; return CASE; }
-        "catch"                     { lookahead_token = CATCH; return CATCH; }
-        "continue"                  { lookahead_token = CONTINUE; return CONTINUE; }
-        "default"                   { lookahead_token = DEFAULT; return DEFAULT; }
-        "delete"                    { lookahead_token = DELETE; return DELETE; }
-        "do"                        { lookahead_token = DO; return DO; }
-        "else"                      { lookahead_token = ELSE; return ELSE; }
-        "finally"                   { lookahead_token = FINALLY; return FINALLY; }
-        "for"                       { lookahead_token = FOR; return FOR; }
-        "function"                  { lookahead_token = FUNCTION; return FUNCTION; }
-        "if"                        { lookahead_token = IF; return IF; }
-        "in"                        { lookahead_token = IN; return IN; }
-        "instanceof"                { lookahead_token = INSTANCEOF; return INSTANCEOF; }
-        "new"                       { lookahead_token = NEW; return NEW; }
-        "return"                    { lookahead_token = RETURN; return RETURN; }
-        "switch"                    { lookahead_token = SWITCH; return SWITCH; }
-        "this"                      { lookahead_token = THIS; return THIS; }
-        "throw"                     { lookahead_token = THROW; return THROW; }
-        "try"                       { lookahead_token = TRY; return TRY; }
-        "typeof"                    { lookahead_token = TYPEOF; return TYPEOF; }
-        "var"                       { lookahead_token = VAR; return VAR; }
-        "void"                      { lookahead_token = VOID; return VOID; }
-        "while"                     { lookahead_token = WHILE; return WHILE; }
-        "with"                      { lookahead_token = WITH; return WITH; }
+        "break"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BREAK); }
+        "case"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CASE); }
+        "catch"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CATCH); }
+        "const"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CONST); }
+        "continue"                  { SET_REGEX_ALLOWED(1); RETURN_TOKEN(CONTINUE); }
+        "default"                   { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DEFAULT); }
+        "delete"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DELETE); }
+        "do"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DO); }
+        "else"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(ELSE); }
+        "finally"                   { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FINALLY); }
+        "for"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FOR); }
+        "function"                  { SET_REGEX_ALLOWED(1); RETURN_TOKEN(FUNCTION); }
+        "if"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(IF); }
+        "in"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(IN); }
+        "instanceof"                { SET_REGEX_ALLOWED(1); RETURN_TOKEN(INSTANCEOF); }
+        "let"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LET); }
+        "new"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(NEW); }
+        "return"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(RETURN); }
+        "switch"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(SWITCH); }
+        "this"                      { SET_REGEX_ALLOWED(0); RETURN_TOKEN(THIS); }
+        "throw"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(THROW); }
+        "try"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(TRY); }
+        "typeof"                    { SET_REGEX_ALLOWED(1); RETURN_TOKEN(TYPEOF); }
+        "var"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(VAR); }
+        "void"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(VOID); }
+        "while"                     { SET_REGEX_ALLOWED(1); RETURN_TOKEN(WHILE); }
+        "with"                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(WITH); }
         
         // Literals
-        "true"                      { yylval.str = strdup("true"); lookahead_token = TRUE; return TRUE; }
-        "false"                     { yylval.str = strdup("false"); lookahead_token = FALSE; return FALSE; }
-        "null"                      { yylval.str = strdup("null"); lookahead_token = NULL_LITERAL; return NULL_LITERAL; }
-        [0-9]+("."[0-9]+)?([eE][+-]?[0-9]+)? { yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = NUMBER; return NUMBER; }
-        "0x"[0-9a-fA-F]+            { yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = NUMBER; return NUMBER; }
-        ["] ([^"\\\n\x00] | "\\" [^\x00])* ["] { yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = STRING; return STRING; }
-        ['] ([^'\\\n\x00] | "\\" [^\x00])* ['] { yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = STRING; return STRING; }
+        "true"                      { yylval.str = strdup("true"); SET_REGEX_ALLOWED(0); RETURN_TOKEN(TRUE); }
+        "false"                     { yylval.str = strdup("false"); SET_REGEX_ALLOWED(0); RETURN_TOKEN(FALSE); }
+        "null"                      { yylval.str = strdup("null"); SET_REGEX_ALLOWED(0); RETURN_TOKEN(NULL_LITERAL); }
         
-        // Identifier
-        [a-zA-Z_$][a-zA-Z0-9_$]*    { yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = IDENTIFIER; return IDENTIFIER; }
-        
-        // Regex literal (simplified)
-        "/" ([^/\\\n\x00*] | "\\" [^\x00] | "[" ([^\]\\\n\x00] | "\\" [^\x00])* "]") ([^/\\\n\x00] | "\\" [^\x00] | "[" ([^\]\\\n\x00] | "\\" [^\x00])* "]")* "/" [gimuy]* {
-            yyleng = cursor - token; yylval.str = strndup(token, yyleng); lookahead_token = REGEX; return REGEX;
+        // Numeric Literals
+        [0-9]+("."[0-9]+)?([eE][+-]?[0-9]+)? { 
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng); 
+            SET_REGEX_ALLOWED(0); 
+            RETURN_TOKEN(NUMBER); 
         }
+        "0x"[0-9a-fA-F]+ { 
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng); 
+            SET_REGEX_ALLOWED(0); 
+            RETURN_TOKEN(NUMBER); 
+        }
+
+        // String Literals
+        ["] ([^"\\\n\x00] | "\\" [^\x00])* ["] { 
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng); 
+            SET_REGEX_ALLOWED(0); 
+            RETURN_TOKEN(STRING); 
+        }
+        ['] ([^'\\\n\x00] | "\\" [^\x00])* ['] { 
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng); 
+            SET_REGEX_ALLOWED(0); 
+            RETURN_TOKEN(STRING); 
+        }
+
+        // Identifier
+        [a-zA-Z_$][a-zA-Z0-9_$]* { 
+            yyleng = cursor - token; yylval.str = strndup(token, yyleng); 
+            SET_REGEX_ALLOWED(0);
+            RETURN_TOKEN(IDENTIFIER); 
+        }
+
+        // Regex vs Division Handling
+        "/" {
+            if (allow_regex) {
+                cursor = token; // Rewind to include the first slash
+                goto regex_state;
+            } else {
+                SET_REGEX_ALLOWED(1);
+                RETURN_TOKEN(DIVIDE);
+            }
+        }
+
+        // Operators
+        "=>"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(ARROW); }
+        "..."                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(ELLIPSIS); }
+
+        ">>>="                      { SET_REGEX_ALLOWED(1); RETURN_TOKEN(URSHIFT_ASSIGN); }
+        ">>>"                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(URSHIFT); }
+        "==="                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(STRICT_EQ); }
+        "!=="                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(STRICT_NE); }
+        "<<="                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LSHIFT_ASSIGN); }
+        ">>="                       { SET_REGEX_ALLOWED(1); RETURN_TOKEN(RSHIFT_ASSIGN); }
+        "<<"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LSHIFT); }
+        ">>"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(RSHIFT); }
+        "<="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LE); }
+        ">="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(GE); }
+        "=="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(EQ); }
+        "!="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(NE); }
+        "++"                        { SET_REGEX_ALLOWED(0); RETURN_TOKEN(INCR); }
+        "--"                        { SET_REGEX_ALLOWED(0); RETURN_TOKEN(DECR); }
+        "&&"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LOGICAL_AND); }
+        "||"                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LOGICAL_OR); }
+        "+="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(PLUS_ASSIGN); }
+        "-="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MINUS_ASSIGN); }
+        "*="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MULTIPLY_ASSIGN); }
+        "/="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(DIVIDE_ASSIGN); }
+        "%="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MOD_ASSIGN); }
+        "&="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(AND_ASSIGN); }
+        "|="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(OR_ASSIGN); }
+        "^="                        { SET_REGEX_ALLOWED(1); RETURN_TOKEN(XOR_ASSIGN); }
         
-        // Operators and punctuation
-        ">>>="                      { lookahead_token = URSHIFT_ASSIGN; return URSHIFT_ASSIGN; }
-        ">>>"                       { lookahead_token = URSHIFT; return URSHIFT; }
-        "==="                       { lookahead_token = STRICT_EQ; return STRICT_EQ; }
-        "!=="                       { lookahead_token = STRICT_NE; return STRICT_NE; }
-        "<<="                       { lookahead_token = LSHIFT_ASSIGN; return LSHIFT_ASSIGN; }
-        ">>="                       { lookahead_token = RSHIFT_ASSIGN; return RSHIFT_ASSIGN; }
-        "<<"                        { lookahead_token = LSHIFT; return LSHIFT; }
-        ">>"                        { lookahead_token = RSHIFT; return RSHIFT; }
-        "<="                        { lookahead_token = LE; return LE; }
-        ">="                        { lookahead_token = GE; return GE; }
-        "=="                        { lookahead_token = EQ; return EQ; }
-        "!="                        { lookahead_token = NE; return NE; }
-        "++"                        { lookahead_token = INCR; return INCR; }
-        "--"                        { lookahead_token = DECR; return DECR; }
-        "&&"                        { lookahead_token = LOGICAL_AND; return LOGICAL_AND; }
-        "||"                        { lookahead_token = LOGICAL_OR; return LOGICAL_OR; }
-        "+="                        { lookahead_token = PLUS_ASSIGN; return PLUS_ASSIGN; }
-        "-="                        { lookahead_token = MINUS_ASSIGN; return MINUS_ASSIGN; }
-        "*="                        { lookahead_token = MULTIPLY_ASSIGN; return MULTIPLY_ASSIGN; }
-        "/="                        { lookahead_token = DIVIDE_ASSIGN; return DIVIDE_ASSIGN; }
-        "%="                        { lookahead_token = MOD_ASSIGN; return MOD_ASSIGN; }
-        "&="                        { lookahead_token = AND_ASSIGN; return AND_ASSIGN; }
-        "|="                        { lookahead_token = OR_ASSIGN; return OR_ASSIGN; }
-        "^="                        { lookahead_token = XOR_ASSIGN; return XOR_ASSIGN; }
-        "{"                         { line_terminator_seen = 0; lookahead_token = LBRACE; return LBRACE; } // Reset before token
-        "}"                         { line_terminator_seen = 0; lookahead_token = RBRACE; return RBRACE; }
-        "("                         { line_terminator_seen = 0; lookahead_token = LPAREN; return LPAREN; }
-        ")"                         { line_terminator_seen = 0; lookahead_token = RPAREN; return RPAREN; }
-        "["                         { line_terminator_seen = 0; lookahead_token = LBRACKET; return LBRACKET; }
-        "]"                         { line_terminator_seen = 0; lookahead_token = RBRACKET; return RBRACKET; }
-        "."                         { line_terminator_seen = 0; lookahead_token = DOT; return DOT; }
-        ";"                         { line_terminator_seen = 0; lookahead_token = SEMICOLON; return SEMICOLON; }
-        ","                         { line_terminator_seen = 0; lookahead_token = COMMA; return COMMA; }
-        "<"                         { lookahead_token = LT; return LT; }
-        ">"                         { lookahead_token = GT; return GT; }
-        "+"                         { lookahead_token = PLUS; return PLUS; }
-        "-"                         { lookahead_token = MINUS; return MINUS; }
-        "*"                         { lookahead_token = MULTIPLY; return MULTIPLY; }
-        "%"                         { lookahead_token = MOD; return MOD; }
-        "&"                         { lookahead_token = BITWISE_AND; return BITWISE_AND; }
-        "|"                         { lookahead_token = BITWISE_OR; return BITWISE_OR; }
-        "^"                         { lookahead_token = BITWISE_XOR; return BITWISE_XOR; }
-        "!"                         { lookahead_token = NOT; return NOT; }
-        "~"                         { lookahead_token = BITWISE_NOT; return BITWISE_NOT; }
-        "?"                         { lookahead_token = QUESTION; return QUESTION; }
-        ":"                         { lookahead_token = COLON; return COLON; }
-        "="                         { lookahead_token = ASSIGN; return ASSIGN; }
-        "/"                         { lookahead_token = DIVIDE; return DIVIDE; }
+        "{"                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(LBRACE); }
+        "}"                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(0); RETURN_TOKEN(RBRACE); }
+        "("                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(LPAREN); }
+        ")"                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(0); RETURN_TOKEN(RPAREN); }
+        "["                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(LBRACKET); }
+        "]"                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(0); RETURN_TOKEN(RBRACKET); }
+        "."                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(DOT); }
+        ";"                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(SEMICOLON); }
+        ","                         { line_terminator_seen = 0; SET_REGEX_ALLOWED(1); RETURN_TOKEN(COMMA); }
         
-        // Any other character
+        "<"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(LT); }
+        ">"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(GT); }
+        "+"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(PLUS); }
+        "-"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MINUS); }
+        "*"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MULTIPLY); }
+        "%"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(MOD); }
+        "&"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BITWISE_AND); }
+        "|"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BITWISE_OR); }
+        "^"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BITWISE_XOR); }
+        "!"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(NOT); }
+        "~"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(BITWISE_NOT); }
+        "?"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(QUESTION); }
+        ":"                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(COLON); }
+        "="                         { SET_REGEX_ALLOWED(1); RETURN_TOKEN(ASSIGN); }
+        
         .                           { 
             fprintf(stderr, "Unexpected character: %c at line %d\n", *token, yylineno);
             goto start;
+        }
+    */
+
+regex_state:
+    /*!re2c
+        // Regex Literal
+        "/" ([^/\\\n\x00] | "\\" [^\x00] | "[" ([^\]\\\n\x00] | "\\" [^\x00])* "]")* "/" [gimuy]* {
+            yyleng = cursor - token;
+            yylval.str = strndup(token, yyleng);
+            SET_REGEX_ALLOWED(0);
+            RETURN_TOKEN(REGEX);
+        }
+        
+        // 修复点：使用 * 匹配任意字符（包括换行符）作为回退
+        // 这处理了 "尝试解析为正则但失败" 的情况（例如遇到换行）
+        * { 
+            cursor = token; // 倒带
+            SET_REGEX_ALLOWED(1); // 假定为除法，后续期待表达式
+            RETURN_TOKEN(DIVIDE); 
         }
     */
 }

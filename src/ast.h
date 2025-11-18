@@ -10,6 +10,8 @@ typedef enum {
     NODE_PROGRAM,
     NODE_FUNCTION_DECL,
     NODE_VAR_DECL,
+    NODE_CONST_DECL, // 新增
+    NODE_LET_DECL,   // 新增
     NODE_IDENTIFIER,
     NODE_LITERAL,
     NODE_BINARY_EXPR,
@@ -31,7 +33,7 @@ typedef enum {
     NODE_THIS_EXPR,
     NODE_CONDITIONAL_EXPR,
     NODE_SEQUENCE_EXPR,
-    NODE_ARROW_FUNCTION // FIX: Added node type for Arrow Functions
+    NODE_ARROW_FUNCTION // 新增
 } NodeType;
 
 // AST Node Structure
@@ -46,15 +48,12 @@ typedef struct ASTNode {
     int col;
 } ASTNode;
 
-// Function declarations
 ASTNode* create_node(NodeType type, const char *value);
 ASTNode* create_binary_node(NodeType type, ASTNode *left, ASTNode *right);
 ASTNode* create_unary_node(NodeType type, ASTNode *child);
 void free_ast(ASTNode *node);
 void print_ast(ASTNode *node, int depth);
 
-// ASI (Automatic Semicolon Insertion) tracking
 extern int asi_triggered;
-extern int last_line;
 
 #endif // AST_H

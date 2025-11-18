@@ -8,25 +8,20 @@ extern int yylex(void);
 extern void init_lexer(const char *input);
 extern int yylineno;
 extern int line_terminator_seen;
-extern int lookahead_token; // 新增：从 lexer 获取下一个 token 类型
+extern int lookahead_token;
 
 void yyerror(const char *s);
 ASTNode *root = NULL;
-extern int asi_triggered; // 声明这是一个在别处定义的外部变量
+extern int asi_triggered;
 
-// ASI Helper: Check if semicolon should be inserted
+// ASI Check
 int check_asi() {
-    // ASI 触发条件:
-    // 1. 前面有换行符
-    // 2. 下一个 token 是 '}'
-    // 3. 下一个 token 是文件结尾 (END)
     if (line_terminator_seen || lookahead_token == RBRACE || lookahead_token == END) {
-        asi_triggered = 1; // 标记ASI被触发
+        asi_triggered = 1;
         return 1;
     }
     return 0;
 }
-
 %}
 
 %union {
@@ -38,10 +33,11 @@ int check_asi() {
 %token <str> IDENTIFIER NUMBER STRING REGEX
 %token <str> BREAK CASE CATCH CONTINUE DEFAULT DELETE DO ELSE FINALLY FOR FUNCTION
 %token <str> IF IN INSTANCEOF NEW RETURN SWITCH THIS THROW TRY TYPEOF VAR VOID WHILE WITH
+%token <str> CONST LET // ES6
 %token <str> TRUE FALSE NULL_LITERAL
 
 %token LBRACE RBRACE LPAREN RPAREN LBRACKET RBRACKET
-%token DOT SEMICOLON COMMA
+%token DOT SEMICOLON COMMA ELLIPSIS ARROW
 %token LT GT LE GE EQ NE STRICT_EQ STRICT_NE
 %token PLUS MINUS MULTIPLY DIVIDE MOD
 %token INCR DECR
@@ -56,11 +52,12 @@ int check_asi() {
 // Non-terminals
 %type <node> Program SourceElements SourceElement Statement Block
 %type <node> VariableStatement VariableDeclarationList VariableDeclaration
+%type <node> LexicalDeclaration BindingList LexicalBinding // ES6
 %type <node> EmptyStatement ExpressionStatement IfStatement IterationStatement
 %type <node> ContinueStatement BreakStatement ReturnStatement WithStatement
 %type <node> SwitchStatement ThrowStatement TryStatement
-%type <node> FunctionDeclaration FunctionExpression
-%type <node> FormalParameterList
+%type <node> FunctionDeclaration FunctionExpression ArrowFunction
+%type <node> FormalParameterList ArrowFormalParameters
 %type <node> Expression ExpressionOpt AssignmentExpression ConditionalExpression
 %type <node> LogicalORExpression LogicalANDExpression BitwiseORExpression
 %type <node> BitwiseXORExpression BitwiseANDExpression EqualityExpression
@@ -74,11 +71,10 @@ int check_asi() {
 %type <node> CaseBlock CaseClauses CaseClause DefaultClause
 %type <node> Catch Finally
 
-// Operator precedence and associativity
+// Precedence
 %nonassoc LOWER_THAN_ELSE
 %nonassoc ELSE
-
-%right ASSIGN PLUS_ASSIGN MINUS_ASSIGN MULTIPLY_ASSIGN DIVIDE_ASSIGN MOD_ASSIGN LSHIFT_ASSIGN RSHIFT_ASSIGN URSHIFT_ASSIGN AND_ASSIGN OR_ASSIGN XOR_ASSIGN
+%right ASSIGN PLUS_ASSIGN MINUS_ASSIGN MULTIPLY_ASSIGN DIVIDE_ASSIGN MOD_ASSIGN LSHIFT_ASSIGN RSHIFT_ASSIGN URSHIFT_ASSIGN AND_ASSIGN OR_ASSIGN XOR_ASSIGN ARROW
 %right QUESTION COLON
 %left LOGICAL_OR
 %left LOGICAL_AND
@@ -124,6 +120,7 @@ SourceElement:
 Statement:
     Block { $$ = $1; }
     | VariableStatement { $$ = $1; }
+    | LexicalDeclaration { $$ = $1; } /* ES6 let/const */
     | EmptyStatement { $$ = $1; }
     | ExpressionStatement { $$ = $1; }
     | IfStatement { $$ = $1; }
@@ -145,6 +142,7 @@ Block:
     }
     ;
 
+/* ES5 Var */
 VariableStatement:
     VAR VariableDeclarationList SEMICOLON { $$ = $2; }
     | VAR VariableDeclarationList {
@@ -175,6 +173,40 @@ VariableDeclaration:
     }
     | IDENTIFIER ASSIGN AssignmentExpression {
         $$ = create_node(NODE_VAR_DECL, $1);
+        $$->left = $3;
+        free($1);
+    }
+    ;
+
+/* ES6 Const/Let */
+LexicalDeclaration:
+    LET BindingList SEMICOLON { $$ = $2; }
+    | LET BindingList {
+         if (check_asi()) { $$ = $2; yyerrok; } else { yyerror("Missing semicolon in let"); YYABORT; }
+    }
+    | CONST BindingList SEMICOLON { $$ = $2; }
+    | CONST BindingList {
+         if (check_asi()) { $$ = $2; yyerrok; } else { yyerror("Missing semicolon in const"); YYABORT; }
+    }
+    ;
+
+BindingList:
+    LexicalBinding { $$ = $1; }
+    | BindingList COMMA LexicalBinding {
+        $$ = $1;
+        ASTNode *temp = $$;
+        while (temp->next) temp = temp->next;
+        temp->next = $3;
+    }
+    ;
+
+LexicalBinding:
+    IDENTIFIER {
+        $$ = create_node(NODE_LET_DECL, $1);
+        free($1);
+    }
+    | IDENTIFIER ASSIGN AssignmentExpression {
+        $$ = create_node(NODE_LET_DECL, $1);
         $$->left = $3;
         free($1);
     }
@@ -249,6 +281,11 @@ IterationStatement:
         $$->right = $6;
         $$->extra = create_binary_node(NODE_SEQUENCE_EXPR, $8, $10);
     }
+    | FOR LPAREN LexicalDeclaration ExpressionOpt SEMICOLON ExpressionOpt RPAREN Statement {
+         /* Simplified ES6 for structure */
+         $$ = create_node(NODE_FOR_STMT, "for-let");
+         $$->left = $3;
+    }
     | FOR LPAREN LeftHandSideExpression IN Expression RPAREN Statement {
         $$ = create_node(NODE_FOR_STMT, "for-in");
         $$->left = $3;
@@ -311,20 +348,23 @@ ReturnStatement:
         $$->left = $2;
     }
     | RETURN {
-        if (check_asi()) {
+        /* Handle Return ASI: if newline seen, it's return undefined */
+        if (line_terminator_seen || check_asi()) {
             $$ = create_node(NODE_RETURN_STMT, NULL);
             yyerrok;
         } else {
-            // Note: This case might be tricky. A return without a value followed by
-            // a newline is valid ASI. A return followed by an expression on the same line
-            // without a semicolon is a syntax error. The current 'error' token logic
-            // might not distinguish this perfectly without more context.
-            // But for most cases, this is a reasonable approximation.
+            /* This path is actually unreachable if lookahead validly starts an expression
+               because Bison shifts. Ideally we need GLR or precedence hacks.
+               But for this project, check_asi covers the "end of block" case.
+            */
             yyerror("Missing semicolon or value after return");
             YYABORT;
         }
     }
     | RETURN Expression {
+        /* Ambiguity: return \n a; -> parsed as return a; by default in Bison LALR(1) 
+           unless we check line_terminator_seen explicitly inside actions, but that's late.
+           For this project, we assume standard shifting unless explicit ASI trigger. */
         if (check_asi()) {
             $$ = create_node(NODE_RETURN_STMT, NULL);
             $$->left = $2;
@@ -493,6 +533,37 @@ FormalParameterList:
     }
     ;
 
+/* Arrow Functions (Simplified Grammar to reduce conflicts) */
+ArrowFunction:
+    IDENTIFIER ARROW Block {
+         $$ = create_node(NODE_ARROW_FUNCTION, "=>");
+         $$->left = create_node(NODE_IDENTIFIER, $1);
+         $$->right = $3;
+         free($1);
+    }
+    | IDENTIFIER ARROW AssignmentExpression {
+         $$ = create_node(NODE_ARROW_FUNCTION, "=>");
+         $$->left = create_node(NODE_IDENTIFIER, $1);
+         $$->right = $3;
+         free($1);
+    }
+    | LPAREN ArrowFormalParameters RPAREN ARROW Block {
+         $$ = create_node(NODE_ARROW_FUNCTION, "=>");
+         $$->left = $2;
+         $$->right = $5;
+    }
+    | LPAREN ArrowFormalParameters RPAREN ARROW AssignmentExpression {
+         $$ = create_node(NODE_ARROW_FUNCTION, "=>");
+         $$->left = $2;
+         $$->right = $5;
+    }
+    ;
+
+ArrowFormalParameters:
+    { $$ = NULL; }
+    | FormalParameterList { $$ = $1; }
+    ;
+
 Expression:
     AssignmentExpression { $$ = $1; }
     | Expression COMMA AssignmentExpression {
@@ -502,6 +573,7 @@ Expression:
 
 AssignmentExpression:
     ConditionalExpression { $$ = $1; }
+    | ArrowFunction { $$ = $1; } /* ES6 */
     | LeftHandSideExpression ASSIGN AssignmentExpression {
         $$ = create_binary_node(NODE_ASSIGNMENT, $1, $3);
     }

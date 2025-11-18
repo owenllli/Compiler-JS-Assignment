@@ -68,61 +68,65 @@
      VOID = 284,
      WHILE = 285,
      WITH = 286,
-     TRUE = 287,
-     FALSE = 288,
-     NULL_LITERAL = 289,
-     LBRACE = 290,
-     RBRACE = 291,
-     LPAREN = 292,
-     RPAREN = 293,
-     LBRACKET = 294,
-     RBRACKET = 295,
-     DOT = 296,
-     SEMICOLON = 297,
-     COMMA = 298,
-     LT = 299,
-     GT = 300,
-     LE = 301,
-     GE = 302,
-     EQ = 303,
-     NE = 304,
-     STRICT_EQ = 305,
-     STRICT_NE = 306,
-     PLUS = 307,
-     MINUS = 308,
-     MULTIPLY = 309,
-     DIVIDE = 310,
-     MOD = 311,
-     INCR = 312,
-     DECR = 313,
-     LSHIFT = 314,
-     RSHIFT = 315,
-     URSHIFT = 316,
-     BITWISE_AND = 317,
-     BITWISE_OR = 318,
-     BITWISE_XOR = 319,
-     BITWISE_NOT = 320,
-     NOT = 321,
-     LOGICAL_AND = 322,
-     LOGICAL_OR = 323,
-     QUESTION = 324,
-     COLON = 325,
-     ASSIGN = 326,
-     PLUS_ASSIGN = 327,
-     MINUS_ASSIGN = 328,
-     MULTIPLY_ASSIGN = 329,
-     DIVIDE_ASSIGN = 330,
-     MOD_ASSIGN = 331,
-     LSHIFT_ASSIGN = 332,
-     RSHIFT_ASSIGN = 333,
-     URSHIFT_ASSIGN = 334,
-     AND_ASSIGN = 335,
-     OR_ASSIGN = 336,
-     XOR_ASSIGN = 337,
-     END = 338,
-     LOWER_THAN_ELSE = 339,
-     UNARY_MINUS = 340,
-     UNARY_PLUS = 341
+     CONST = 287,
+     LET = 288,
+     TRUE = 289,
+     FALSE = 290,
+     NULL_LITERAL = 291,
+     LBRACE = 292,
+     RBRACE = 293,
+     LPAREN = 294,
+     RPAREN = 295,
+     LBRACKET = 296,
+     RBRACKET = 297,
+     DOT = 298,
+     SEMICOLON = 299,
+     COMMA = 300,
+     ELLIPSIS = 301,
+     ARROW = 302,
+     LT = 303,
+     GT = 304,
+     LE = 305,
+     GE = 306,
+     EQ = 307,
+     NE = 308,
+     STRICT_EQ = 309,
+     STRICT_NE = 310,
+     PLUS = 311,
+     MINUS = 312,
+     MULTIPLY = 313,
+     DIVIDE = 314,
+     MOD = 315,
+     INCR = 316,
+     DECR = 317,
+     LSHIFT = 318,
+     RSHIFT = 319,
+     URSHIFT = 320,
+     BITWISE_AND = 321,
+     BITWISE_OR = 322,
+     BITWISE_XOR = 323,
+     BITWISE_NOT = 324,
+     NOT = 325,
+     LOGICAL_AND = 326,
+     LOGICAL_OR = 327,
+     QUESTION = 328,
+     COLON = 329,
+     ASSIGN = 330,
+     PLUS_ASSIGN = 331,
+     MINUS_ASSIGN = 332,
+     MULTIPLY_ASSIGN = 333,
+     DIVIDE_ASSIGN = 334,
+     MOD_ASSIGN = 335,
+     LSHIFT_ASSIGN = 336,
+     RSHIFT_ASSIGN = 337,
+     URSHIFT_ASSIGN = 338,
+     AND_ASSIGN = 339,
+     OR_ASSIGN = 340,
+     XOR_ASSIGN = 341,
+     END = 342,
+     LOWER_THAN_ELSE = 343,
+     UNARY_MINUS = 344,
+     UNARY_PLUS = 345
    };
 #endif
 /* Tokens.  */
@@ -155,74 +159,78 @@
 #define VOID 284
 #define WHILE 285
 #define WITH 286
-#define TRUE 287
-#define FALSE 288
-#define NULL_LITERAL 289
-#define LBRACE 290
-#define RBRACE 291
-#define LPAREN 292
-#define RPAREN 293
-#define LBRACKET 294
-#define RBRACKET 295
-#define DOT 296
-#define SEMICOLON 297
-#define COMMA 298
-#define LT 299
-#define GT 300
-#define LE 301
-#define GE 302
-#define EQ 303
-#define NE 304
-#define STRICT_EQ 305
-#define STRICT_NE 306
-#define PLUS 307
-#define MINUS 308
-#define MULTIPLY 309
-#define DIVIDE 310
-#define MOD 311
-#define INCR 312
-#define DECR 313
-#define LSHIFT 314
-#define RSHIFT 315
-#define URSHIFT 316
-#define BITWISE_AND 317
-#define BITWISE_OR 318
-#define BITWISE_XOR 319
-#define BITWISE_NOT 320
-#define NOT 321
-#define LOGICAL_AND 322
-#define LOGICAL_OR 323
-#define QUESTION 324
-#define COLON 325
-#define ASSIGN 326
-#define PLUS_ASSIGN 327
-#define MINUS_ASSIGN 328
-#define MULTIPLY_ASSIGN 329
-#define DIVIDE_ASSIGN 330
-#define MOD_ASSIGN 331
-#define LSHIFT_ASSIGN 332
-#define RSHIFT_ASSIGN 333
-#define URSHIFT_ASSIGN 334
-#define AND_ASSIGN 335
-#define OR_ASSIGN 336
-#define XOR_ASSIGN 337
-#define END 338
-#define LOWER_THAN_ELSE 339
-#define UNARY_MINUS 340
-#define UNARY_PLUS 341
+#define CONST 287
+#define LET 288
+#define TRUE 289
+#define FALSE 290
+#define NULL_LITERAL 291
+#define LBRACE 292
+#define RBRACE 293
+#define LPAREN 294
+#define RPAREN 295
+#define LBRACKET 296
+#define RBRACKET 297
+#define DOT 298
+#define SEMICOLON 299
+#define COMMA 300
+#define ELLIPSIS 301
+#define ARROW 302
+#define LT 303
+#define GT 304
+#define LE 305
+#define GE 306
+#define EQ 307
+#define NE 308
+#define STRICT_EQ 309
+#define STRICT_NE 310
+#define PLUS 311
+#define MINUS 312
+#define MULTIPLY 313
+#define DIVIDE 314
+#define MOD 315
+#define INCR 316
+#define DECR 317
+#define LSHIFT 318
+#define RSHIFT 319
+#define URSHIFT 320
+#define BITWISE_AND 321
+#define BITWISE_OR 322
+#define BITWISE_XOR 323
+#define BITWISE_NOT 324
+#define NOT 325
+#define LOGICAL_AND 326
+#define LOGICAL_OR 327
+#define QUESTION 328
+#define COLON 329
+#define ASSIGN 330
+#define PLUS_ASSIGN 331
+#define MINUS_ASSIGN 332
+#define MULTIPLY_ASSIGN 333
+#define DIVIDE_ASSIGN 334
+#define MOD_ASSIGN 335
+#define LSHIFT_ASSIGN 336
+#define RSHIFT_ASSIGN 337
+#define URSHIFT_ASSIGN 338
+#define AND_ASSIGN 339
+#define OR_ASSIGN 340
+#define XOR_ASSIGN 341
+#define END 342
+#define LOWER_THAN_ELSE 343
+#define UNARY_MINUS 344
+#define UNARY_PLUS 345
 
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 32 "src/parser.y"
+#line 27 "src/parser.y"
 {
     ASTNode *node;
     char *str;
 }
 /* Line 1529 of yacc.c.  */
-#line 226 "build/parser.h"
+#line 234 "build/parser.h"
 	YYSTYPE;
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
